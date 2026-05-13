@@ -25,7 +25,7 @@ _CLASSIFY_QUESTION = "What is the person in this image doing? Describe briefly."
 
 # キーワードから行動カテゴリを推定する
 _KEYWORD_MAP: list[tuple[str, list[str]]] = [
-    ("away",          ["empty", "no one", "nobody", "no person", "vacant", "no human"]),
+    ("away",          ["empty", "no one", "nobody", "no person", "vacant", "no human", "blank", "gray", "grey", "nothing", "no activity", "no individual", "no subject"]),
     ("distracted",    ["phone", "smartphone", "social media", "youtube", "gaming", "game", "distracted", "scrolling"]),
     ("communication", ["talking", "speaking", "meeting", "call", "video call", "conversation", "zoom", "teams"]),
     ("break",         ["eating", "drinking", "coffee", "resting", "sleeping", "stretching", "relaxing", "food", "lunch"]),
@@ -126,6 +126,7 @@ class LocalActivityClassifier:
             answer = LocalActivityClassifier._model.answer_question(
                 enc, _CLASSIFY_QUESTION, LocalActivityClassifier._tokenizer
             )
+            logger.info("Moondream2 answer: %r", answer)
             data = _classify_from_text(answer)
         except Exception as exc:
             logger.warning("LocalClassifier failed (%s), using fallback", exc)
