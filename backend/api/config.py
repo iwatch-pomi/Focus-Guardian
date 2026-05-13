@@ -21,11 +21,8 @@ class Settings(BaseSettings):
     edge_ai_only: bool = True
     retain_raw_image_seconds: int = 0
 
-    # Database
+    # Database (local SQLite)
     database_url: str = "sqlite+aiosqlite:///./data/focus_guardian.db"
-
-    # Serverless (Vercel): disables background scheduler
-    is_serverless: bool = False
 
     # API
     api_host: str = "127.0.0.1"

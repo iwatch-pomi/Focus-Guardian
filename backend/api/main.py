@@ -1,9 +1,4 @@
-"""Focus Guardian — FastAPI application entry point.
-
-Route prefix "/api/v1" is used so the same app works on both:
-- Local dev   (uvicorn at localhost:8000, frontend proxies /api/v1/* → localhost:8000/api/v1/*)
-- Vercel      (Python serverless function receives original path /api/v1/* from Vercel rewrite)
-"""
+"""Focus Guardian — FastAPI application entry point."""
 
 from __future__ import annotations
 
@@ -13,19 +8,14 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..api.config import settings
 from ..db.database import AsyncSessionLocal, EnergyLogORM, SnapshotORM, get_db, init_db
-from ..models.schemas import (
-    AvatarFrame,
-    EnergySnapshot,
-    Snapshot,
-    TimeStats,
-)
+from ..models.schemas import AvatarFrame, EnergySnapshot, Snapshot, TimeStats
 from ..privacy.processor import anonymize_to_pixel_art_state, focus_to_color
 from ..sensing.snapshot import ActivityReading, SnapshotEngine
 
@@ -39,10 +29,9 @@ _snapshot_engine: SnapshotEngine | None = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
-    if not settings.is_serverless:
-        global _snapshot_engine
-        _snapshot_engine = SnapshotEngine(on_snapshot=_persist_reading)
-        await _snapshot_engine.start()
+    global _snapshot_engine
+    _snapshot_engine = SnapshotEngine(on_snapshot=_persist_reading)
+    await _snapshot_engine.start()
     yield
     if _snapshot_engine:
         await _snapshot_engine.stop()
@@ -57,14 +46,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# All endpoints are mounted at /api/v1 so they work on both local and Vercel
-router = APIRouter(prefix="/api/v1")
 
 
 async def _persist_reading(reading: ActivityReading) -> None:
@@ -101,14 +87,10 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 @app.get("/health")
 async def health() -> dict:
-    return {
-        "status": "ok",
-        "session_id": _current_session_id,
-        "serverless": settings.is_serverless,
-    }
+    return {"status": "ok", "session_id": _current_session_id}
 
 
-@router.get("/snapshots", response_model=list[Snapshot])
+@app.get("/snapshots", response_model=list[Snapshot])
 async def list_snapshots(db: DbDep, limit: int = 50) -> list[SnapshotORM]:
     result = await db.execute(
         select(SnapshotORM)
@@ -119,7 +101,7 @@ async def list_snapshots(db: DbDep, limit: int = 50) -> list[SnapshotORM]:
     return result.scalars().all()  # type: ignore[return-value]
 
 
-@router.get("/avatar/timeline", response_model=list[AvatarFrame])
+@app.get("/avatar/timeline", response_model=list[AvatarFrame])
 async def avatar_timeline(db: DbDep, limit: int = 24) -> list[AvatarFrame]:
     result = await db.execute(
         select(SnapshotORM)
@@ -140,7 +122,7 @@ async def avatar_timeline(db: DbDep, limit: int = 24) -> list[AvatarFrame]:
     ]
 
 
-@router.get("/energy/current", response_model=EnergySnapshot | None)
+@app.get("/energy/current", response_model=EnergySnapshot | None)
 async def current_energy(db: DbDep) -> EnergyLogORM | None:
     result = await db.execute(
         select(EnergyLogORM)
@@ -160,13 +142,12 @@ async def current_energy(db: DbDep) -> EnergyLogORM | None:
     )
 
 
-@router.get("/analysis/stats", response_model=TimeStats)
+@app.get("/analysis/stats", response_model=TimeStats)
 async def time_stats(db: DbDep, hours: int = 8) -> TimeStats:
     from ..analysis.technical import TechnicalAnalyzer
 
     period_end = datetime.now(timezone.utc)
     period_start = period_end - timedelta(hours=hours)
-
     result = await db.execute(
         select(SnapshotORM)
         .where(
@@ -176,23 +157,20 @@ async def time_stats(db: DbDep, hours: int = 8) -> TimeStats:
         .order_by(SnapshotORM.captured_at.asc())
     )
     snaps = result.scalars().all()
-
     analyzer = TechnicalAnalyzer()
     for s in snaps:
-        analyzer.ingest(
-            {
-                "id": s.id,
-                "captured_at": s.captured_at,
-                "activity_category": s.activity_category,
-                "focus_level": s.focus_level,
-                "energy_focus": 50.0,
-                "energy_fatigue": 50.0,
-            }
-        )
+        analyzer.ingest({
+            "id": s.id,
+            "captured_at": s.captured_at,
+            "activity_category": s.activity_category,
+            "focus_level": s.focus_level,
+            "energy_focus": 50.0,
+            "energy_fatigue": 50.0,
+        })
     return analyzer.compute_time_stats(period_start, period_end)
 
 
-@router.get("/analysis/predictions", response_model=list)
+@app.get("/analysis/predictions", response_model=list)
 async def predictions(db: DbDep) -> list:
     from ..analysis.technical import TechnicalAnalyzer
 
@@ -202,28 +180,22 @@ async def predictions(db: DbDep) -> list:
         .order_by(SnapshotORM.captured_at.asc())
     )
     snaps = result.scalars().all()
-
     analyzer = TechnicalAnalyzer()
     for s in snaps:
-        analyzer.ingest(
-            {
-                "id": s.id,
-                "captured_at": s.captured_at,
-                "activity_category": s.activity_category,
-                "focus_level": s.focus_level,
-                "energy_focus": 50.0,
-                "energy_fatigue": 50.0,
-            }
-        )
+        analyzer.ingest({
+            "id": s.id,
+            "captured_at": s.captured_at,
+            "activity_category": s.activity_category,
+            "focus_level": s.focus_level,
+            "energy_focus": 50.0,
+            "energy_fatigue": 50.0,
+        })
     return [w.model_dump() for w in analyzer.predict_risk_windows()]
 
 
-@router.post("/snapshot/manual", response_model=dict)
+@app.post("/snapshot/manual", response_model=dict)
 async def trigger_manual_snapshot() -> dict:
-    """Manually trigger a snapshot (also used by Vercel Cron)."""
-    engine = SnapshotEngine(on_snapshot=_persist_reading)
-    await engine._capture_and_analyze()
+    if _snapshot_engine is None:
+        raise HTTPException(status_code=503, detail="Snapshot engine not running")
+    await _snapshot_engine._capture_and_analyze()
     return {"status": "triggered", "session_id": _current_session_id}
-
-
-app.include_router(router)

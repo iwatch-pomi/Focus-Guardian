@@ -1,12 +1,9 @@
 /**
  * Focus Guardian API client.
- *
- * Always calls /api/v1/* (relative URL).
- * - Local dev:  Next.js rewrites to http://localhost:8000/api/v1/*
- * - Vercel:     vercel.json routes to the Python serverless function
+ * Calls /api/backend/* which Next.js proxies to http://localhost:8000/*
  */
 
-const BASE = "/api/v1";
+const BASE = "/api/backend";
 
 export type ActivityCategory =
   | "deep_work"
