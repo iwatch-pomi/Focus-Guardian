@@ -1,4 +1,8 @@
-"""SQLAlchemy async database setup."""
+"""SQLAlchemy async database setup.
+
+Supports SQLite (local dev) and PostgreSQL (Vercel / cloud).
+Set DATABASE_URL to a postgres:// or postgresql:// URL for production.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +13,25 @@ from sqlalchemy.orm import DeclarativeBase
 from ..api.config import settings
 
 
-engine = create_async_engine(settings.database_url, echo=False)
+def _normalize_db_url(url: str) -> str:
+    """Normalize Vercel Postgres URL to an asyncpg-compatible form."""
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+asyncpg://", 1)
+    if url.startswith("postgresql://") and "+asyncpg" not in url:
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
+
+
+_db_url = _normalize_db_url(settings.database_url)
+_is_postgres = _db_url.startswith("postgresql+asyncpg")
+
+engine = create_async_engine(
+    _db_url,
+    echo=False,
+    # Serverless-friendly pool settings for Postgres
+    pool_size=1 if _is_postgres else 5,
+    max_overflow=0 if _is_postgres else 10,
+)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 

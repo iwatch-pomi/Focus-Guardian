@@ -1,9 +1,12 @@
 /**
- * Focus Guardian API client — typed wrappers around the FastAPI backend.
- * All requests go through Next.js rewrites to /api/backend/* to avoid CORS issues.
+ * Focus Guardian API client.
+ *
+ * Always calls /api/v1/* (relative URL).
+ * - Local dev:  Next.js rewrites to http://localhost:8000/api/v1/*
+ * - Vercel:     vercel.json routes to the Python serverless function
  */
 
-const BASE = "/api/backend";
+const BASE = "/api/v1";
 
 export type ActivityCategory =
   | "deep_work"

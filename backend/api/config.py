@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite+aiosqlite:///./data/focus_guardian.db"
 
+    # Serverless (Vercel): disables background scheduler
+    is_serverless: bool = False
+
     # API
     api_host: str = "127.0.0.1"
     api_port: int = 8000
