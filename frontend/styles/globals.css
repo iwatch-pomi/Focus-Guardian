@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap");
+
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --border: #1e1e2e;
+  --text: #e2e8f0;
+  --muted: #64748b;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.card {
+  @apply rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-sm p-5;
+}
+
+.stat-value {
+  @apply text-3xl font-bold tabular-nums;
+}
+
+.pixel-avatar {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
