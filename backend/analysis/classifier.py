@@ -21,19 +21,40 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_CLASSIFY_QUESTION = (
-    "Look at this image and classify the person's activity. "
-    "Return ONLY a JSON object with these exact fields: "
-    '{"activity_category": one of ["deep_work","shallow_work","communication","break","distracted","away","unknown"], '
-    '"focus_level": integer 1-5, '
-    '"confidence": float 0.0-1.0, '
-    '"energy_focus": float 0.0-100.0, '
-    '"energy_fatigue": float 0.0-100.0, '
-    '"notes": string max 60 chars}. '
-    "deep_work=focused on screen/reading, shallow_work=email/admin, "
-    "communication=call/meeting, break=resting/eating, "
-    "distracted=phone/social media, away=empty desk."
-)
+_CLASSIFY_QUESTION = "What is the person in this image doing? Describe briefly."
+
+# キーワードから行動カテゴリを推定する
+_KEYWORD_MAP: list[tuple[str, list[str]]] = [
+    ("away",          ["empty", "no one", "nobody", "no person", "vacant", "no human"]),
+    ("distracted",    ["phone", "smartphone", "social media", "youtube", "gaming", "game", "distracted", "scrolling"]),
+    ("communication", ["talking", "speaking", "meeting", "call", "video call", "conversation", "zoom", "teams"]),
+    ("break",         ["eating", "drinking", "coffee", "resting", "sleeping", "stretching", "relaxing", "food", "lunch"]),
+    ("deep_work",     ["coding", "programming", "writing", "reading", "studying", "focused", "working", "typing", "laptop", "computer", "screen"]),
+    ("shallow_work",  ["email", "browsing", "scrolling", "admin", "calendar", "spreadsheet"]),
+]
+
+_FOCUS_LEVEL_MAP: dict[str, int] = {
+    "deep_work": 5, "shallow_work": 3,
+    "communication": 3, "break": 2,
+    "distracted": 1, "away": 1, "unknown": 3,
+}
+
+
+def _classify_from_text(answer: str) -> dict:
+    """モデルの自然言語回答をキーワードマッチで行動カテゴリに変換する。"""
+    low = answer.lower()
+    for category, keywords in _KEYWORD_MAP:
+        if any(k in low for k in keywords):
+            focus = _FOCUS_LEVEL_MAP[category]
+            return {
+                "activity_category": category,
+                "focus_level": focus,
+                "confidence": 0.7,
+                "energy_focus": focus * 20.0,
+                "energy_fatigue": max(0.0, (5 - focus) * 15.0),
+                "notes": answer[:60],
+            }
+    return {**_FALLBACK, "notes": answer[:60] if answer else "no answer"}
 
 _FALLBACK = {
     "activity_category": "unknown",
@@ -105,7 +126,7 @@ class LocalActivityClassifier:
             answer = LocalActivityClassifier._model.answer_question(
                 enc, _CLASSIFY_QUESTION, LocalActivityClassifier._tokenizer
             )
-            data = _parse(answer)
+            data = _classify_from_text(answer)
         except Exception as exc:
             logger.warning("LocalClassifier failed (%s), using fallback", exc)
             data = _FALLBACK
@@ -135,7 +156,7 @@ class ActivityClassifier:
                     {"type": "text", "text": "Classify this snapshot."},
                 ]}],
             )
-            data = _parse(response.content[0].text)
+            data = _classify_from_text(response.content[0].text)
         except Exception as exc:
             logger.warning("CloudClassifier failed (%s), using fallback", exc)
             data = _FALLBACK
