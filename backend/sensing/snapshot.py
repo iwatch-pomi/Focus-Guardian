@@ -59,9 +59,9 @@ class SnapshotEngine:
             await self._capture_and_analyze()
 
     async def _capture_and_analyze(self) -> None:
-        from ..analysis.classifier import ActivityClassifier
+        from ..analysis.classifier import get_classifier
 
-        classifier = ActivityClassifier()
+        classifier = get_classifier()
         image = await self._acquire_frame()
 
         if image is None:

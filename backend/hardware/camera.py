@@ -48,22 +48,39 @@ class PrivacyCamera:
         return await asyncio.to_thread(self._capture_hardware)
 
     def _capture_hardware(self) -> "Image | None":
+        # OpenCV（Windows / Linux / Mac 共通）を優先して試みる
         try:
+            import cv2
+            from PIL import Image
+
+            cap = cv2.VideoCapture(0)
+            if not cap.isOpened():
+                raise RuntimeError("No camera found via OpenCV")
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, self._resolution[0])
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self._resolution[1])
+            ret, frame = cap.read()
+            cap.release()
+            if not ret:
+                raise RuntimeError("OpenCV frame capture failed")
+            return Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        except ImportError:
+            pass  # opencv-python 未インストール → picamera2 を試みる
+        except Exception as exc:
+            logger.warning("OpenCV capture failed: %s — trying picamera2", exc)
+
+        # Raspberry Pi 向け fallback
+        try:
+            import time
             from picamera2 import Picamera2
+            from PIL import Image
 
             cam = Picamera2()
-            config = cam.create_still_configuration(
-                main={"size": self._resolution}
-            )
-            cam.configure(config)
+            cam.configure(cam.create_still_configuration(main={"size": self._resolution}))
             cam.start()
-            import time
-            time.sleep(0.5)  # warm-up
+            time.sleep(0.5)
             frame = cam.capture_array()
             cam.stop()
             cam.close()
-
-            from PIL import Image
             return Image.fromarray(frame)
         except Exception as exc:
             logger.error("Hardware capture failed: %s", exc)

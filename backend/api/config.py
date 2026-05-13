@@ -12,6 +12,9 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = ""
 
+    # 分類モード: True=ローカル(Moondream2) / False=Claude Vision API
+    use_local_model: bool = True
+
     # Sensing
     snapshot_interval_seconds: int = 600
     snapshot_interval_min: int = 300
